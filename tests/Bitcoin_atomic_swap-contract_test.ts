@@ -70,3 +70,14 @@ Clarinet.test({
                 types.principal(alice.address)
             ], deployer.address)
         ]);
+
+         // Mine blocks to pass deadline
+         chain.mineEmptyBlockUntil(12);
+        
+         let refundBlock = chain.mineBlock([
+             Tx.contractCall('atomic-swap', 'refund', [], deployer.address)
+         ]);
+         
+         assertEquals(refundBlock.receipts[0].result, '(ok true)');
+     }
+ });
