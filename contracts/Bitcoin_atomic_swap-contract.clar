@@ -13,3 +13,55 @@
 (define-data-var timelock uint u0)
 (define-data-var stx-amount uint u0)
 (define-data-var recipient principal tx-sender)
+
+;; Read-only functions
+(define-read-only (get-swap-details)
+    (ok {
+        initialized: (var-get swap-initialized),
+        hash: (var-get hash-lock),
+        deadline: (var-get timelock),
+        amount: (var-get stx-amount),
+        swap-recipient: (var-get recipient)
+    })
+)
+
+;; Initialize swap
+(define-public (initialize-swap 
+    (hash (buff 32)) 
+    (deadline uint) 
+    (amount uint)
+    (swap-recipient principal))
+    (begin
+        (asserts! (not (var-get swap-initialized)) ERR-ALREADY-INITIALIZED)
+        (asserts! (> deadline block-height) ERR-EXPIRED)
+        
+        (var-set hash-lock hash)
+        (var-set timelock deadline)
+        (var-set stx-amount amount)
+        (var-set recipient swap-recipient)
+        (var-set swap-initialized true)
+        
+        ;; Lock the STX
+        (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+        (ok true)
+    )
+)
+
+;; Claim funds with secret
+(define-public (claim-with-secret (secret (buff 32)))
+    (begin
+        (asserts! (var-get swap-initialized) ERR-UNAUTHORIZED)
+        (asserts! (<= block-height (var-get timelock)) ERR-EXPIRED)
+        (asserts! (is-eq (sha256 secret) (var-get hash-lock)) ERR-WRONG-SECRET)
+        
+        ;; Transfer STX to recipient
+        (try! (as-contract (stx-transfer? 
+            (var-get stx-amount)
+            tx-sender
+            (var-get recipient))))
+            
+        ;; Reset contract state
+        (var-set swap-initialized false)
+        (ok true)
+    )
+)
