@@ -65,3 +65,22 @@
         (ok true)
     )
 )
+
+;; Refund after timeout
+(define-public (refund)
+    (begin
+        (asserts! (var-get swap-initialized) ERR-UNAUTHORIZED)
+        (asserts! (> block-height (var-get timelock)) ERR-EXPIRED)
+        
+        ;; Return STX to original sender
+        (try! (as-contract (stx-transfer? 
+            (var-get stx-amount)
+            tx-sender
+            tx-sender)))
+            
+        ;; Reset contract state
+        (var-set swap-initialized false)
+        (ok true)
+    )
+)
+
